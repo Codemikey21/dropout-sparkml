@@ -58,7 +58,7 @@ st.markdown(
         background: #ffffff; border: 1px solid #dfe5ec; border-radius: 14px;
         padding: 0.8rem 1rem; box-shadow: 0 2px 8px rgba(29,53,87,0.06);
     }
-    div[data-testid="stMetricValue"] { color: #1d3557; }
+    div[data-testid="stMetricValue"] { color: #1d3557; font-size: 1.75rem; }
     .paso { background:#ffffff; border-left: 5px solid #2a9d8f; border-radius: 10px;
             padding: 0.7rem 1rem; margin-bottom: 0.6rem; box-shadow: 0 2px 6px rgba(29,53,87,0.05); }
     .paso b { color: #1d3557; }
@@ -546,7 +546,7 @@ with tab_modelo:
         imp = pd.DataFrame(metricas["importancias"])
         barras = (alt.Chart(imp).mark_bar(cornerRadiusEnd=5)
                   .encode(x=alt.X("Importancia:Q", axis=alt.Axis(format="%")),
-                          y=alt.Y("Variable:N", sort="-x", title=None),
+                          y=alt.Y("Variable:N", sort="-x", title=None, axis=alt.Axis(labelLimit=320)),
                           color=alt.condition(alt.FieldOneOfPredicate(field="Variable", oneOf=[
                               v for v in imp["Variable"] if "derivada" in v]),
                               alt.value("#e76f51"), alt.value("#2a9d8f")),

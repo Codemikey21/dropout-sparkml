@@ -51,11 +51,19 @@ Una universidad quiere identificar de forma temprana a los estudiantes en riesgo
 5. **(e)** Muestra la clase predicha destacada, traducida con el orden de `labels` del `StringIndexer`, y la probabilidad de cada clase en un gráfico y una tabla.
 6. **Extra:** la pestaña *Sobre el modelo* muestra la comparación de modelos, la matriz de confusión, las métricas por clase y las variables más importantes; la pestaña *Cómo funciona* explica el flujo de datos.
 
-### Capturas
+### Capturas de la app funcionando
 
-| Formulario | Resultado |
-|---|---|
-| ![Formulario](capturas/formulario.png) | ![Resultado](capturas/resultado.png) |
+**Inicio:** indicadores del modelo, perfiles de ejemplo y formulario
+![Inicio](capturas/inicio.png)
+
+**Formulario:** perfil de riesgo alto cargado en la pestaña *Rendimiento académico*
+![Formulario](capturas/formulario.png)
+
+**Resultado:** clase predicha destacada y probabilidad de cada clase (gráfico + tabla)
+![Resultado](capturas/resultado.png)
+
+**Sobre el modelo:** comparación de modelos, matriz de confusión, métricas por clase e importancia de variables
+![Sobre el modelo](capturas/sobre_el_modelo.png)
 
 ## 📁 Estructura del repositorio
 
