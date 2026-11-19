@@ -19,6 +19,8 @@ import streamlit as st
 BASE_DIR = Path(__file__).resolve().parent
 RUTA_MODELO = BASE_DIR / "modelo_final"
 RUTA_BANNER = BASE_DIR / "assets" / "banner.png"
+RUTA_METRICAS = BASE_DIR / "assets" / "metricas.json"
+URL_REPO = "https://github.com/Codemikey21/dropout-sparkml"
 AUTOR = "Miguel Ángel Solano Díaz"
 
 st.set_page_config(page_title="Alerta Temprana de Deserción", page_icon="🎓", layout="wide")
@@ -52,6 +54,14 @@ st.markdown(
         border-top: 1px solid #dfe5ec; margin-top: 2rem; font-size: 0.95rem;
     }
     div[data-testid="stForm"] { background: #ffffff; border-radius: 14px; border: 1px solid #dfe5ec; }
+    div[data-testid="stMetric"] {
+        background: #ffffff; border: 1px solid #dfe5ec; border-radius: 14px;
+        padding: 0.8rem 1rem; box-shadow: 0 2px 8px rgba(29,53,87,0.06);
+    }
+    div[data-testid="stMetricValue"] { color: #1d3557; }
+    .paso { background:#ffffff; border-left: 5px solid #2a9d8f; border-radius: 10px;
+            padding: 0.7rem 1rem; margin-bottom: 0.6rem; box-shadow: 0 2px 6px rgba(29,53,87,0.05); }
+    .paso b { color: #1d3557; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -236,7 +246,35 @@ def predecir(modelo, labels, schema, valores):
 
 
 # ---------------------------------------------------------------------------
-# Widgets del formulario
+# Perfiles de ejemplo (para probar la app con un clic)
+# ---------------------------------------------------------------------------
+PERFILES = {
+    "🟥 Riesgo alto": {
+        "debtor": 1, "tuition_fees_up_to_date": 0, "scholarship_holder": 0, "age_at_enrollment": 27,
+        "curricular_units_1st_sem_enrolled": 6, "curricular_units_1st_sem_evaluations": 7,
+        "curricular_units_1st_sem_approved": 1, "curricular_units_1st_sem_grade": 10.0,
+        "curricular_units_2nd_sem_enrolled": 6, "curricular_units_2nd_sem_evaluations": 4,
+        "curricular_units_2nd_sem_approved": 0, "curricular_units_2nd_sem_grade": 0.0,
+    },
+    "🟨 Riesgo intermedio": {
+        "debtor": 0, "tuition_fees_up_to_date": 1, "scholarship_holder": 0, "age_at_enrollment": 20,
+        "curricular_units_1st_sem_enrolled": 6, "curricular_units_1st_sem_evaluations": 11,
+        "curricular_units_1st_sem_approved": 4, "curricular_units_1st_sem_grade": 11.5,
+        "curricular_units_2nd_sem_enrolled": 6, "curricular_units_2nd_sem_evaluations": 12,
+        "curricular_units_2nd_sem_approved": 3, "curricular_units_2nd_sem_grade": 11.2,
+    },
+    "🟩 Trayectoria favorable": {
+        "debtor": 0, "tuition_fees_up_to_date": 1, "scholarship_holder": 1, "age_at_enrollment": 20,
+        "curricular_units_1st_sem_enrolled": 6, "curricular_units_1st_sem_evaluations": 6,
+        "curricular_units_1st_sem_approved": 6, "curricular_units_1st_sem_grade": 14.2,
+        "curricular_units_2nd_sem_enrolled": 6, "curricular_units_2nd_sem_evaluations": 6,
+        "curricular_units_2nd_sem_approved": 6, "curricular_units_2nd_sem_grade": 14.6,
+    },
+}
+
+
+# ---------------------------------------------------------------------------
+# Widgets del formulario (valores guardados en st.session_state)
 # ---------------------------------------------------------------------------
 def describir_codigo(columna, codigo, version_v2):
     if columna == "course":
@@ -246,26 +284,61 @@ def describir_codigo(columna, codigo, version_v2):
     return f"Código {codigo}"
 
 
+def valor_defecto(columna, tipo, categorias):
+    if columna in BINARIAS:
+        return "Sí" if VALORES_DEFECTO.get(columna, 0) == 1 else "No"
+    if columna in categorias:
+        codigos = categorias[columna]
+        preferido = {"course": 11, "application_mode": 1}.get(columna)
+        return preferido if preferido in codigos else codigos[0]
+    if tipo in ("int", "bigint"):
+        return int(VALORES_DEFECTO.get(columna, 0))
+    return float(VALORES_DEFECTO.get(columna, 0.0))
+
+
+def inicializar_estado(columnas_schema, categorias):
+    for col, tipo in columnas_schema.items():
+        if col not in st.session_state:
+            st.session_state[col] = valor_defecto(col, tipo, categorias)
+
+
+def aplicar_perfil():
+    perfil = PERFILES.get(st.session_state.get("perfil_ejemplo"))
+    if not perfil:
+        return
+    for col, valor in perfil.items():
+        if col not in st.session_state:
+            continue
+        if col in BINARIAS:
+            st.session_state[col] = "Sí" if valor == 1 else "No"
+        elif isinstance(st.session_state[col], float):
+            st.session_state[col] = float(valor)
+        else:
+            st.session_state[col] = int(valor)
+
+
 def widget(columna, tipo, categorias, version_v2, contenedor):
     etiqueta = ETIQUETAS.get(columna, columna.replace("_", " ").capitalize())
     if columna in BINARIAS:
-        defecto = VALORES_DEFECTO.get(columna, 0)
-        opcion = contenedor.radio(etiqueta, ["Sí", "No"], index=0 if defecto == 1 else 1,
-                                  horizontal=True, key=columna)
+        opcion = contenedor.radio(etiqueta, ["Sí", "No"], horizontal=True, key=columna)
         return 1 if opcion == "Sí" else 0
     if columna in categorias:
-        codigos = categorias[columna]
-        return contenedor.selectbox(etiqueta, codigos, key=columna,
-                                    format_func=lambda x: f"{describir_codigo(columna, x, version_v2)}"
-                                    if columna in ("course", "application_mode") else f"Código {x}")
+        return contenedor.selectbox(
+            etiqueta, categorias[columna], key=columna,
+            format_func=lambda x: describir_codigo(columna, x, version_v2))
     if tipo in ("int", "bigint"):
         minimo, maximo = LIMITES.get(columna, (0, 60))
-        return contenedor.number_input(etiqueta, min_value=int(minimo), max_value=int(maximo),
-                                       value=int(VALORES_DEFECTO.get(columna, 0)), step=1, key=columna)
+        return contenedor.number_input(etiqueta, min_value=int(minimo), max_value=int(maximo), step=1, key=columna)
     minimo, maximo = LIMITES.get(columna, (0.0, 20.0))
-    return contenedor.number_input(etiqueta, min_value=float(minimo), max_value=float(maximo),
-                                   value=float(VALORES_DEFECTO.get(columna, 0.0)), step=0.1,
+    return contenedor.number_input(etiqueta, min_value=float(minimo), max_value=float(maximo), step=0.1,
                                    format="%.2f", key=columna)
+
+
+@st.cache_data
+def cargar_metricas():
+    if RUTA_METRICAS.exists():
+        return json.loads(RUTA_METRICAS.read_text(encoding="utf-8"))
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -277,17 +350,29 @@ st.title("🎓 Alerta Temprana de Deserción Estudiantil")
 st.markdown("Predice con **Spark ML** si un estudiante va a **desertar**, **seguir matriculado** "
             "o **graduarse**, a partir de su información de ingreso y de sus dos primeros semestres.")
 
+try:
+    modelo, labels, schema, categorias, nombre_modelo = cargar_modelo()
+except Exception as error:  # noqa: BLE001
+    st.error(f"No se pudo cargar el modelo desde '{RUTA_MODELO.name}/'. Detalle: {error}")
+    st.stop()
+
+metricas = cargar_metricas()
+columnas_schema = {c["nombre"]: c["tipo"] for c in schema["columnas"]}
+version_v2 = max(categorias.get("course", [0])) > 100
+inicializar_estado(columnas_schema, categorias)
+
 with st.sidebar:
     st.header("📋 Instrucciones de uso")
     st.markdown(
         """
-        1. Completa los datos del estudiante en las tres secciones del formulario:
-           **Perfil**, **Familia** y **Rendimiento académico**.
-        2. En cada semestre, las materias **aprobadas** no pueden superar a las **inscritas**
+        1. **Opcional:** elige un **perfil de ejemplo** para llenar el formulario con un clic.
+        2. Completa o ajusta los datos del estudiante en las pestañas **Perfil**, **Familia**
+           y **Rendimiento académico**.
+        3. En cada semestre, las materias **aprobadas** no pueden superar a las **inscritas**
            ni a las **evaluaciones presentadas**.
-        3. Presiona **Predecir**.
-        4. Revisa la **clase predicha** (tarjeta de color) y la **probabilidad de cada clase**
-           en la tabla y el gráfico.
+        4. Presiona **🔮 Predecir**.
+        5. Revisa la **clase predicha** (tarjeta de color) y la **probabilidad de cada clase**
+           en el gráfico y la tabla.
 
         **Clases posibles**
         - 🟥 **Dropout:** abandona la carrera.
@@ -297,106 +382,207 @@ with st.sidebar:
     )
     st.caption("Las variables derivadas (tasas de aprobación, variación de la nota y eficiencia) "
                "se calculan automáticamente dentro de la app.")
-
-try:
-    modelo, labels, schema, categorias, nombre_modelo = cargar_modelo()
-except Exception as error:  # noqa: BLE001
-    st.error(f"No se pudo cargar el modelo desde '{RUTA_MODELO.name}/'. Detalle: {error}")
-    st.stop()
-
-with st.sidebar:
     st.divider()
-    st.markdown(f"**Modelo:** {nombre_modelo} (Spark ML {schema.get('pyspark_version', '')})")
-    st.markdown(f"**Variables de entrada:** {len(schema['columnas'])}")
+    st.markdown(f"**Modelo:** {nombre_modelo} · Spark ML {schema.get('pyspark_version', '')}")
+    st.markdown(f"**Variables de entrada:** {len(schema['columnas'])} + 5 derivadas")
+    st.markdown(f"[📂 Repositorio en GitHub]({URL_REPO})")
 
-columnas_schema = {c["nombre"]: c["tipo"] for c in schema["columnas"]}
-version_v2 = max(categorias.get("course", [0])) > 100
-semestre1 = [c for c in columnas_schema if c.startswith("curricular_units_1st_sem")]
-semestre2 = [c for c in columnas_schema if c.startswith("curricular_units_2nd_sem")]
-familia = [c for c in columnas_schema if c.startswith(("mothers_", "fathers_"))]
-macro = [c for c in columnas_schema if c in ("unemployment_rate", "inflation_rate", "gdp")]
-perfil = [c for c in columnas_schema if c not in semestre1 + semestre2 + familia + macro]
+if metricas:
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Modelo seleccionado", metricas["mejor_modelo"])
+    k2.metric("F1 ponderado (prueba)", f"{metricas['test']['f1']:.3f}")
+    k3.metric("Accuracy (prueba)", f"{metricas['test']['accuracy'] * 100:.1f} %")
+    k4.metric("Recall de Enrolled", f"{metricas['test']['recall_enrolled'] * 100:.1f} %",
+              delta=f"+{(metricas['control_pesos']['recall_enrolled_con'] - metricas['control_pesos']['recall_enrolled_sin']) * 100:.1f} pts con pesos")
 
-# (b) Formulario con todas las variables que usa el modelo y botón Predecir
-valores = {}
-with st.form("formulario_estudiante"):
-    tab_perfil, tab_familia, tab_academico = st.tabs(["👤 Perfil", "👨‍👩‍👧 Familia", "📚 Rendimiento académico"])
-    with tab_perfil:
-        cols = st.columns(2)
-        for i, col in enumerate(perfil + macro):
-            valores[col] = widget(col, columnas_schema[col], categorias, version_v2, cols[i % 2])
-    with tab_familia:
-        cols = st.columns(2)
-        for i, col in enumerate(familia):
-            valores[col] = widget(col, columnas_schema[col], categorias, version_v2, cols[i % 2])
-        st.caption("Los códigos de formación y ocupación corresponden a la clasificación oficial del dataset.")
-    with tab_academico:
-        c1, c2 = st.columns(2)
-        c1.subheader("1.er semestre")
-        c2.subheader("2.º semestre")
-        for col in semestre1:
-            valores[col] = widget(col, columnas_schema[col], categorias, version_v2, c1)
-        for col in semestre2:
-            valores[col] = widget(col, columnas_schema[col], categorias, version_v2, c2)
-    enviado = st.form_submit_button("🔮 Predecir", type="primary", width="stretch")
+tab_prediccion, tab_modelo, tab_como = st.tabs(["🔮 Predicción", "📊 Sobre el modelo", "⚙️ Cómo funciona"])
 
-if enviado:
-    errores = []
-    for s, nombre in (("1st", "1.er"), ("2nd", "2.º")):
-        aprobadas = valores.get(f"curricular_units_{s}_sem_approved", 0)
-        if aprobadas > valores.get(f"curricular_units_{s}_sem_enrolled", aprobadas):
-            errores.append(f"{nombre} semestre: las materias aprobadas superan a las inscritas.")
-        if aprobadas > valores.get(f"curricular_units_{s}_sem_evaluations", aprobadas):
-            errores.append(f"{nombre} semestre: las materias aprobadas superan a las evaluaciones presentadas.")
-    if errores:
-        for e in errores:
-            st.error(e)
-        st.stop()
+# ---------------------------------------------------------------------------
+# Pestaña 1: Predicción
+# ---------------------------------------------------------------------------
+with tab_prediccion:
+    semestre1 = [c for c in columnas_schema if c.startswith("curricular_units_1st_sem")]
+    semestre2 = [c for c in columnas_schema if c.startswith("curricular_units_2nd_sem")]
+    familia = [c for c in columnas_schema if c.startswith(("mothers_", "fathers_"))]
+    macro = [c for c in columnas_schema if c in ("unemployment_rate", "inflation_rate", "gdp")]
+    perfil = [c for c in columnas_schema if c not in semestre1 + semestre2 + familia + macro]
 
-    with st.spinner("Calculando la predicción con Spark..."):
-        clase, probabilidades, derivadas = predecir(modelo, labels, schema, valores)
+    st.selectbox("⚡ Perfil de ejemplo (llena el formulario automáticamente)",
+                 ["— Elegir —"] + list(PERFILES.keys()), key="perfil_ejemplo", on_change=aplicar_perfil)
 
-    # (e) Clase predicha destacada + probabilidad de cada clase (tabla y gráfico)
-    st.header("Resultado de la predicción")
-    izq, der = st.columns([1, 1.3])
-    with izq:
-        st.markdown(
-            f"""
-            <div class="tarjeta-resultado" style="background:{COLORES_CLASE.get(clase, '#264653')}">
-                <div class="etiqueta">Clase predicha</div>
-                <div class="clase">{NOMBRES_CLASE.get(clase, clase)}</div>
-                <div class="prob">Probabilidad: <b>{probabilidades[clase] * 100:.1f} %</b></div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.info(MENSAJES_CLASE.get(clase, ""))
-    with der:
-        tabla = pd.DataFrame({"Clase": list(probabilidades.keys()),
-                              "Probabilidad": list(probabilidades.values())})
-        tabla = tabla.sort_values("Probabilidad", ascending=False).reset_index(drop=True)
+    # (b) Formulario con todas las variables que usa el modelo y botón Predecir
+    valores = {}
+    with st.form("formulario_estudiante"):
+        sub_perfil, sub_familia, sub_academico = st.tabs(["👤 Perfil", "👨‍👩‍👧 Familia", "📚 Rendimiento académico"])
+        with sub_perfil:
+            cols = st.columns(2)
+            for i, col in enumerate(perfil + macro):
+                valores[col] = widget(col, columnas_schema[col], categorias, version_v2, cols[i % 2])
+        with sub_familia:
+            cols = st.columns(2)
+            for i, col in enumerate(familia):
+                valores[col] = widget(col, columnas_schema[col], categorias, version_v2, cols[i % 2])
+            st.caption("Los códigos de formación y ocupación corresponden a la clasificación oficial del dataset.")
+        with sub_academico:
+            c1, c2 = st.columns(2)
+            c1.subheader("1.er semestre")
+            c2.subheader("2.º semestre")
+            for col in semestre1:
+                valores[col] = widget(col, columnas_schema[col], categorias, version_v2, c1)
+            for col in semestre2:
+                valores[col] = widget(col, columnas_schema[col], categorias, version_v2, c2)
+        enviado = st.form_submit_button("🔮 Predecir", type="primary", width="stretch")
+
+    if enviado:
+        errores = []
+        for s, nombre in (("1st", "1.er"), ("2nd", "2.º")):
+            aprobadas = valores.get(f"curricular_units_{s}_sem_approved", 0)
+            if aprobadas > valores.get(f"curricular_units_{s}_sem_enrolled", aprobadas):
+                errores.append(f"{nombre} semestre: las materias aprobadas superan a las inscritas.")
+            if aprobadas > valores.get(f"curricular_units_{s}_sem_evaluations", aprobadas):
+                errores.append(f"{nombre} semestre: las materias aprobadas superan a las evaluaciones presentadas.")
+
+        if errores:
+            for e in errores:
+                st.error(e)
+        else:
+            with st.spinner("Calculando la predicción con Spark..."):
+                clase, probabilidades, derivadas = predecir(modelo, labels, schema, valores)
+
+            # (e) Clase predicha destacada + probabilidad de cada clase (gráfico y tabla)
+            st.subheader("Resultado de la predicción")
+            izq, der = st.columns([1, 1.3])
+            with izq:
+                st.markdown(
+                    f"""
+                    <div class="tarjeta-resultado" style="background:{COLORES_CLASE.get(clase, '#264653')}">
+                        <div class="etiqueta">Clase predicha</div>
+                        <div class="clase">{NOMBRES_CLASE.get(clase, clase)}</div>
+                        <div class="prob">Probabilidad: <b>{probabilidades[clase] * 100:.1f} %</b></div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.info(MENSAJES_CLASE.get(clase, ""))
+            with der:
+                import altair as alt
+
+                tabla = pd.DataFrame({"Clase": list(probabilidades.keys()),
+                                      "Probabilidad": list(probabilidades.values())})
+                tabla = tabla.sort_values("Probabilidad", ascending=False).reset_index(drop=True)
+                grafico = (alt.Chart(tabla)
+                           .mark_bar(cornerRadiusEnd=6)
+                           .encode(x=alt.X("Probabilidad:Q", axis=alt.Axis(format="%"), scale=alt.Scale(domain=[0, 1])),
+                                   y=alt.Y("Clase:N", sort="-x", title=None),
+                                   color=alt.Color("Clase:N", legend=None,
+                                                   scale=alt.Scale(domain=list(COLORES_CLASE.keys()),
+                                                                   range=list(COLORES_CLASE.values()))),
+                                   tooltip=["Clase", alt.Tooltip("Probabilidad:Q", format=".1%")])
+                           .properties(height=180, title="Probabilidad por clase"))
+                st.altair_chart(grafico, width="stretch")
+                tabla_vista = tabla.copy()
+                tabla_vista["Probabilidad"] = (tabla_vista["Probabilidad"] * 100).map("{:.2f} %".format)
+                st.dataframe(tabla_vista, hide_index=True, width="stretch")
+
+            with st.expander("🧮 Variables derivadas calculadas por la app (punto 3 del notebook)"):
+                nombres_derivadas = {
+                    "tasa_aprob_1sem": "Tasa de aprobación 1.er semestre",
+                    "tasa_aprob_2sem": "Tasa de aprobación 2.º semestre",
+                    "variacion_nota": "Variación de la nota (2.º − 1.er)",
+                    "variacion_tasa_aprob": "Variación de la tasa de aprobación",
+                    "eficiencia_evaluaciones": "Eficiencia en evaluaciones",
+                }
+                st.dataframe(pd.DataFrame({
+                    "Variable": [nombres_derivadas.get(k, k) for k in derivadas],
+                    "Valor": [round(float(v), 4) for v in derivadas.values()],
+                }), hide_index=True, width="stretch")
+
+# ---------------------------------------------------------------------------
+# Pestaña 2: Sobre el modelo
+# ---------------------------------------------------------------------------
+with tab_modelo:
+    if not metricas:
+        st.info("No se encontró assets/metricas.json.")
+    else:
         import altair as alt
-        grafico = (alt.Chart(tabla)
-                   .mark_bar(cornerRadiusEnd=6)
-                   .encode(x=alt.X("Probabilidad:Q", axis=alt.Axis(format="%"), scale=alt.Scale(domain=[0, 1])),
-                           y=alt.Y("Clase:N", sort="-x", title=None),
-                           color=alt.Color("Clase:N", legend=None,
-                                           scale=alt.Scale(domain=list(COLORES_CLASE.keys()),
-                                                           range=list(COLORES_CLASE.values()))),
-                           tooltip=["Clase", alt.Tooltip("Probabilidad:Q", format=".1%")])
-                   .properties(height=180, title="Probabilidad por clase"))
-        st.altair_chart(grafico, width="stretch")
-        tabla_vista = tabla.copy()
-        tabla_vista["Probabilidad"] = (tabla_vista["Probabilidad"] * 100).map("{:.2f} %".format)
-        st.dataframe(tabla_vista, hide_index=True, width="stretch")
 
-    with st.expander("Ver las variables derivadas calculadas por la app"):
-        st.dataframe(pd.DataFrame({"Variable": list(derivadas.keys()),
-                                   "Valor": [round(float(v), 4) for v in derivadas.values()]}),
-                     hide_index=True, width="stretch")
+        st.subheader("Comparación de los tres modelos (conjunto de prueba)")
+        st.caption("Los tres modelos se entrenaron dentro de un Pipeline completo y se ajustaron con "
+                   "ParamGridBuilder + CrossValidator (3 folds, F1 ponderado). El mejor se eligió por el F1 "
+                   "ponderado y el recall de la clase minoritaria (Enrolled).")
+        comp = pd.DataFrame(metricas["comparacion"])
+        st.dataframe(comp, hide_index=True, width="stretch")
+
+        izq, der = st.columns(2)
+        with izq:
+            st.subheader("Matriz de confusión")
+            mc = metricas["matriz_confusion"]
+            filas = [{"Real": r, "Predicha": p, "Estudiantes": mc["valores"][i][j]}
+                     for i, r in enumerate(mc["clases"]) for j, p in enumerate(mc["clases"])]
+            base = alt.Chart(pd.DataFrame(filas)).encode(
+                x=alt.X("Predicha:N", sort=mc["clases"]), y=alt.Y("Real:N", sort=mc["clases"]))
+            mapa = base.mark_rect(cornerRadius=4).encode(
+                color=alt.Color("Estudiantes:Q", scale=alt.Scale(scheme="tealblues"), legend=None))
+            texto = base.mark_text(fontSize=16, fontWeight="bold").encode(
+                text="Estudiantes:Q",
+                color=alt.condition(alt.datum.Estudiantes > 150, alt.value("white"), alt.value("#1d3557")))
+            st.altair_chart((mapa + texto).properties(height=300), width="stretch")
+        with der:
+            st.subheader("Métricas por clase")
+            st.dataframe(pd.DataFrame(metricas["por_clase"]), hide_index=True, width="stretch")
+            st.markdown(
+                f"""
+                - Solo **{mc['valores'][1][0]} desertores** se confunden con *Graduate* (el error más costoso).
+                - Con **pesos por clase**, el recall de *Enrolled* sube de
+                  **{metricas['control_pesos']['recall_enrolled_sin'] * 100:.1f} %** a
+                  **{metricas['control_pesos']['recall_enrolled_con'] * 100:.1f} %**.
+                - Hiperparámetros: `numTrees={metricas['hiperparametros']['numTrees']}`,
+                  `maxDepth={metricas['hiperparametros']['maxDepth']}` · F1 en validación cruzada:
+                  **{metricas['f1_cv']:.4f}**.
+                """
+            )
+
+        st.subheader("Variables más importantes")
+        imp = pd.DataFrame(metricas["importancias"])
+        barras = (alt.Chart(imp).mark_bar(cornerRadiusEnd=5)
+                  .encode(x=alt.X("Importancia:Q", axis=alt.Axis(format="%")),
+                          y=alt.Y("Variable:N", sort="-x", title=None),
+                          color=alt.condition(alt.FieldOneOfPredicate(field="Variable", oneOf=[
+                              v for v in imp["Variable"] if "derivada" in v]),
+                              alt.value("#e76f51"), alt.value("#2a9d8f")),
+                          tooltip=["Variable", alt.Tooltip("Importancia:Q", format=".2%")])
+                  .properties(height=320))
+        st.altair_chart(barras, width="stretch")
+        st.caption("En naranja, las variables derivadas creadas en la ingeniería de características: "
+                   "3 de ellas están entre las 4 más importantes.")
+
+# ---------------------------------------------------------------------------
+# Pestaña 3: Cómo funciona
+# ---------------------------------------------------------------------------
+with tab_como:
+    st.subheader("Del dato crudo a la predicción")
+    pasos = [
+        ("1. Formulario", "Se capturan las variables que usa el modelo con sus tipos exactos del entrenamiento (`schema_entrada.json`)."),
+        ("2. Variables derivadas", "La app calcula las mismas 5 variables del notebook con control de división por cero: tasas de aprobación por semestre, variación de la nota, variación de la tasa y eficiencia en evaluaciones."),
+        ("3. DataFrame de Spark", "Los datos se convierten en un DataFrame de Spark con `spark.createDataFrame` y el esquema guardado."),
+        ("4. PipelineModel", "El modelo cargado con `PipelineModel.load` aplica StringIndexer (handleInvalid='keep') → OneHotEncoder → VectorAssembler → StandardScaler → Random Forest."),
+        ("5. Resultado", "El índice de `prediction` y el vector `probability` se traducen a nombres de clase con el orden de `labels.json` (StringIndexer de Target)."),
+    ]
+    for titulo, texto in pasos:
+        st.markdown(f"<div class='paso'><b>{titulo}</b><br>{texto}</div>", unsafe_allow_html=True)
+
+    if metricas:
+        d = metricas["datos"]
+        st.subheader("Datos de entrenamiento")
+        a, b, c = st.columns(3)
+        a.metric("Estudiantes", f"{d['estudiantes']:,}".replace(",", "."))
+        b.metric("Entrenamiento / prueba", f"{d['train']:,} / {d['test']:,}".replace(",", "."))
+        c.metric("Variables del modelo", d["variables_modelo"])
+    st.caption("Dataset: Predict Students' Dropout and Academic Success (Kaggle / UCI). "
+               "Spark y el modelo se mantienen en memoria con @st.cache_resource.")
 
 st.markdown(
     f"<div class='pie-pagina'>Desarrollado por <b>{AUTOR}</b> · Examen de Big Data – Spark ML · "
-    f"Universidad Autónoma de Bucaramanga (UNAB)</div>",
+    f"Universidad Autónoma de Bucaramanga (UNAB) · <a href='{URL_REPO}' target='_blank'>GitHub</a></div>",
     unsafe_allow_html=True,
 )
