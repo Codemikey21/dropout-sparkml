@@ -53,6 +53,9 @@ Una universidad quiere identificar de forma temprana a los estudiantes en riesgo
 
 ### Capturas de la app funcionando
 
+**App desplegada en Streamlit Community Cloud** (URL pública visible): perfil de riesgo alto → *Deserción (Dropout)* con 94,5 %
+![App desplegada](capturas/app_desplegada.png)
+
 **Inicio:** indicadores del modelo, perfiles de ejemplo y formulario
 ![Inicio](capturas/inicio.png)
 
