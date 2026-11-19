@@ -2,7 +2,7 @@
 
 Aplicación web que predice si un estudiante universitario va a **desertar (Dropout)**, **seguir matriculado sin graduarse a tiempo (Enrolled)** o **graduarse (Graduate)**, usando un modelo de clasificación multiclase entrenado con **Spark ML**.
 
-🔗 **App desplegada:** URL_DE_LA_APP
+🔗 **App desplegada:** https://dropout-sparkml-mhwghwptazajzmsycfj4aj.streamlit.app/
 
 ![Banner](assets/banner.png)
 
