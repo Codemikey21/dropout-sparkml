@@ -1,0 +1,130 @@
+{
+  "pyspark_version": "4.0.5",
+  "modelo": "RandomForest",
+  "columnas": [
+    {
+      "nombre": "application_mode",
+      "tipo": "int",
+      "categorica": true
+    },
+    {
+      "nombre": "course",
+      "tipo": "int",
+      "categorica": true
+    },
+    {
+      "nombre": "mothers_qualification",
+      "tipo": "int",
+      "categorica": true
+    },
+    {
+      "nombre": "fathers_qualification",
+      "tipo": "int",
+      "categorica": true
+    },
+    {
+      "nombre": "mothers_occupation",
+      "tipo": "int",
+      "categorica": true
+    },
+    {
+      "nombre": "fathers_occupation",
+      "tipo": "int",
+      "categorica": true
+    },
+    {
+      "nombre": "debtor",
+      "tipo": "int",
+      "categorica": true
+    },
+    {
+      "nombre": "tuition_fees_up_to_date",
+      "tipo": "int",
+      "categorica": true
+    },
+    {
+      "nombre": "scholarship_holder",
+      "tipo": "int",
+      "categorica": true
+    },
+    {
+      "nombre": "age_at_enrollment",
+      "tipo": "int",
+      "categorica": false
+    },
+    {
+      "nombre": "curricular_units_1st_sem_enrolled",
+      "tipo": "int",
+      "categorica": false
+    },
+    {
+      "nombre": "curricular_units_1st_sem_evaluations",
+      "tipo": "int",
+      "categorica": false
+    },
+    {
+      "nombre": "curricular_units_1st_sem_approved",
+      "tipo": "int",
+      "categorica": false
+    },
+    {
+      "nombre": "curricular_units_1st_sem_grade",
+      "tipo": "double",
+      "categorica": false
+    },
+    {
+      "nombre": "curricular_units_2nd_sem_enrolled",
+      "tipo": "int",
+      "categorica": false
+    },
+    {
+      "nombre": "curricular_units_2nd_sem_evaluations",
+      "tipo": "int",
+      "categorica": false
+    },
+    {
+      "nombre": "curricular_units_2nd_sem_approved",
+      "tipo": "int",
+      "categorica": false
+    },
+    {
+      "nombre": "curricular_units_2nd_sem_grade",
+      "tipo": "double",
+      "categorica": false
+    }
+  ],
+  "variables_derivadas": [
+    "tasa_aprob_1sem",
+    "tasa_aprob_2sem",
+    "variacion_nota",
+    "variacion_tasa_aprob",
+    "eficiencia_evaluaciones"
+  ],
+  "categoricas_modelo": [
+    "application_mode",
+    "course",
+    "mothers_qualification",
+    "fathers_qualification",
+    "mothers_occupation",
+    "fathers_occupation",
+    "debtor",
+    "tuition_fees_up_to_date",
+    "scholarship_holder"
+  ],
+  "numericas_modelo": [
+    "age_at_enrollment",
+    "curricular_units_1st_sem_enrolled",
+    "curricular_units_1st_sem_evaluations",
+    "curricular_units_1st_sem_approved",
+    "curricular_units_1st_sem_grade",
+    "curricular_units_2nd_sem_enrolled",
+    "curricular_units_2nd_sem_evaluations",
+    "curricular_units_2nd_sem_approved",
+    "curricular_units_2nd_sem_grade",
+    "tasa_aprob_1sem",
+    "tasa_aprob_2sem",
+    "variacion_nota",
+    "variacion_tasa_aprob",
+    "eficiencia_evaluaciones"
+  ]
+}
